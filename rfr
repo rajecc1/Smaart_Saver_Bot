@@ -1,0 +1,53 @@
+import logging
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler
+
+TOKEN = '8623046652:AAF_201pX_nnlDHyrJVtZ6Fvii3paPSY5WM'
+
+logging.basicConfig(level=logging.INFO)
+
+# Тексты на разных языках
+LANGS = {
+    'ru': {'greet': "🇷🇺 Выбран русский язык. Напиши товар для поиска:", 'search': "Ищу"},
+    'ua': {'greet': "🇺🇦 Обрано українську мову. Напишіть товар для пошуку:", 'search': "Шукаю"},
+    'cz': {'greet': "🇨🇿 Byla zvolena čeština. Napište název zboží:", 'search': "Hledám"}
+}
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [
+        [
+            InlineKeyboardButton("🇷🇺 RU", callback_data='set_ru'),
+            InlineKeyboardButton("🇺🇦 UA", callback_data='set_ua'),
+            InlineKeyboardButton("🇨🇿 CZ", callback_data='set_cz')
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("Выберите язык / Оберіть мову / Vyberte jazyk:", reply_markup=reply_markup)
+
+async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    lang_code = query.data.split('_')[1]
+    context.user_data['lang'] = lang_code
+    await query.edit_message_text(LANGS[lang_code]['greet'])
+
+async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    lang = context.user_data.get('lang', 'ru') # По умолчанию RU
+    query_text = update.message.text
+    s = query_text.replace(" ", "+")
+    
+    text_search = LANGS[lang]['search']
+    
+    keyboard = [
+        [InlineKeyboardButton("🇨🇿 Heureka.cz", url=f"https://www.heureka.cz/?h%5Bfraze%5D={s}")],
+        [InlineKeyboardButton("🇺🇦 Hotline.ua", url=f"https://hotline.ua/sr/?q={s}")],
+        [InlineKeyboardButton("🇪🇺 Amazon.de", url=f"https://www.amazon.de/s?k={s}")]
+    ]
+    await update.message.reply_text(f"🔍 {text_search} '{query_text}':", reply_markup=InlineKeyboardMarkup(keyboard))
+
+if __name__ == '__main__':
+    app = ApplicationBuilder().token(TOKEN).build()
+    app.add_handler(CommandHandler('start', start))
+    app.add_handler(CallbackQueryHandler(set_language, pattern='^set_'))
+    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), search))
+    app.run_polling()
